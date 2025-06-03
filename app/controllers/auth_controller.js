@@ -1,20 +1,30 @@
-import { User } from "../models/index.js";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import config from "../../config/config.js";
+import crypto from "crypto";
+import { Op } from "sequelize";
+import { User } from "../models/index.js";
+import config from "../config/config.js";
+import { 
+    successResponse, 
+    errorResponse, 
+    createdResponse, 
+    unauthorizedResponse, 
+    badRequestResponse 
+} from "../utils/responseHandler.js";
+import { UK_COUNTRIES } from '../validations/country_schemas.js';
 
-// Token generation helper
+// Helper function to generate tokens
 const generateTokens = (userId) => {
-  // Access token - short lived (15 minutes)
-  const accessToken = jwt.sign({ userId }, config.development.jwt.secret, {
-    expiresIn: "15m",
-  });
+  const accessToken = jwt.sign(
+    { userId, tokenType: "access" },
+    config.jwt.secret,
+    { expiresIn: config.jwt.accessExpiry }
+  );
 
-  // Refresh token - long lived (7 days)
   const refreshToken = jwt.sign(
     { userId, tokenType: "refresh" },
-    config.development.jwt.secret,
-    { expiresIn: "7d" }
+    config.jwt.secret,
+    { expiresIn: config.jwt.refreshExpiry }
   );
 
   return { accessToken, refreshToken };
@@ -26,12 +36,12 @@ export async function login(req, res) {
   try {
     const user = await User.findOne({ where: { email } });
     if (!user) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      return unauthorizedResponse(res, "Invalid credentials");
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      return unauthorizedResponse(res, "Invalid credentials");
     }
 
     // Generate both tokens
@@ -58,23 +68,52 @@ export async function login(req, res) {
       ...userData
     } = user.toJSON();
     
-    res.json({
+    return successResponse(res, {
       user: userData,
       accessToken,
       refreshToken,
     });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    return errorResponse(res, error.message);
   }
 }
 
 // Register controller
 export async function register(req, res) {
-  const { fullName, username, email, password, country } = req.body;
+  const { fullName, username, email, password, country, adminToken } = req.body;
   try {
-    const existingUser = await User.findOne({ where: { email } });
+    // Check if this is the first user (to be made admin)
+    const userCount = await User.count();
+    const isFirstUser = userCount === 0;
+
+    // Validate country code
+    const upperCode = country.toUpperCase();
+    if (!Object.keys(UK_COUNTRIES).includes(upperCode)) {
+      return badRequestResponse(res, 'Invalid country code. Must be one of: GB-ENG, GB-WLS, GB-SCT, GB-NIR');
+    }
+
+    // Check for existing user
+    const existingUser = await User.findOne({ 
+      where: { 
+        [Op.or]: [{ email }, { username }] 
+      } 
+    });
+    
     if (existingUser) {
-      return res.status(400).json({ error: "Email already registered" });
+      return badRequestResponse(res, "Email or username already registered");
+    }
+
+    // Determine if user should be admin
+    let isAdmin = false;
+    if (isFirstUser) {
+      // First user is automatically made admin
+      isAdmin = true;
+    } else if (adminToken) {
+      // Check if admin token is valid
+      if (!config.admin.registrationToken || adminToken !== config.admin.registrationToken) {
+        return unauthorizedResponse(res, "Invalid admin registration token");
+      }
+      isAdmin = true;
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -83,7 +122,8 @@ export async function register(req, res) {
       username,
       email,
       password: hashedPassword,
-      country,
+      country: upperCode,
+      isAdmin
     });
 
     // Generate both tokens
@@ -102,13 +142,15 @@ export async function register(req, res) {
       refreshTokenExpiry: ___,
       ...userData
     } = newUser.toJSON();
-    res.status(201).json({
+
+    return createdResponse(res, {
       user: userData,
       accessToken,
       refreshToken,
+      message: isAdmin ? "Admin user created successfully" : "User registered successfully"
     });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    return errorResponse(res, error.message);
   }
 }
 
@@ -117,15 +159,15 @@ export async function refreshToken(req, res) {
   const { refreshToken } = req.body;
 
   if (!refreshToken) {
-    return res.status(401).json({ error: "Refresh token is required" });
+    return unauthorizedResponse(res, "Refresh token is required");
   }
 
   try {
     // Verify the refresh token
-    const decoded = jwt.verify(refreshToken, config.development.jwt.secret);
+    const decoded = jwt.verify(refreshToken, config.jwt.secret);
 
     if (decoded.tokenType !== "refresh") {
-      return res.status(401).json({ error: "Invalid token type" });
+      return unauthorizedResponse(res, "Invalid token type");
     }
 
     // Find user with this refresh token
@@ -138,7 +180,7 @@ export async function refreshToken(req, res) {
     });
 
     if (!user) {
-      return res.status(401).json({ error: "Invalid refresh token" });
+      return unauthorizedResponse(res, "Invalid refresh token");
     }
 
     // Generate new tokens
@@ -150,7 +192,7 @@ export async function refreshToken(req, res) {
       refreshTokenExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
 
-    res.json({
+    return successResponse(res, {
       tokens: {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
@@ -158,9 +200,9 @@ export async function refreshToken(req, res) {
     });
   } catch (error) {
     if (error.name === "JsonWebTokenError") {
-      return res.status(401).json({ error: "Invalid refresh token" });
+      return unauthorizedResponse(res, "Invalid refresh token");
     }
-    res.status(400).json({ error: error.message });
+    return errorResponse(res, error.message);
   }
 }
 
@@ -180,9 +222,9 @@ export async function logout(req, res) {
       }
     );
 
-    res.json({ message: "Logged out successfully" });
+    return successResponse(res, null, "Logged out successfully");
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    return errorResponse(res, error.message);
   }
 }
 
@@ -193,10 +235,7 @@ export async function forgotPassword(req, res) {
     const user = await User.findOne({ where: { email } });
     if (!user) {
       // Return success even if user doesn't exist (security best practice)
-      return res.json({
-        message:
-          "If your email is registered, you will receive a password reset link",
-      });
+      return successResponse(res, null, "If your email is registered, you will receive a password reset link");
     }
 
     // Generate reset token
@@ -213,12 +252,9 @@ export async function forgotPassword(req, res) {
     // You'll need to implement email sending functionality
     // Example: await sendResetEmail(user.email, resetToken);
 
-    res.json({
-      message:
-        "If your email is registered, you will receive a password reset link",
-    });
+    return successResponse(res, null, "If your email is registered, you will receive a password reset link");
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    return errorResponse(res, error.message);
   }
 }
 
@@ -234,7 +270,7 @@ export async function resetPassword(req, res) {
     });
 
     if (!user) {
-      return res.status(400).json({ error: "Invalid or expired reset token" });
+      return badRequestResponse(res, "Invalid or expired reset token");
     }
 
     // Hash new password
@@ -247,8 +283,8 @@ export async function resetPassword(req, res) {
       resetTokenExpiry: null,
     });
 
-    res.json({ message: "Password has been reset successfully" });
+    return successResponse(res, null, "Password has been reset successfully");
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    return errorResponse(res, error.message);
   }
 }

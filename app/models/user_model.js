@@ -34,6 +34,12 @@ export default (sequelize, DataTypes) => {
     refreshTokenExpiry: {
       type: DataTypes.DATE,
       allowNull: true
+    },
+    isAdmin: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      comment: 'Whether the user has admin privileges'
     }
   });
 };

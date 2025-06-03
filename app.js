@@ -1,29 +1,34 @@
 import express, { json } from "express";
-const app = express();
+import { errorResponse, notFoundResponse } from "./app/utils/responseHandler.js";
 import authRoutes from "./app/routes/auth_routes.js";
 import binRoutes from "./app/routes/bin_routes.js";
-app.use(json()); // to handle JSON body
+import countryRoutes from "./app/routes/country_routes.js";
+import userRoutes from './app/routes/user_routes.js';
+import config from './app/config/config.js';
 
+const app = express();
+
+// Middleware
+app.use(json());
+
+// Routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/bins", binRoutes);
+app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/countries", countryRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({
-    status: 'error',
-    message: 'Something went wrong!'
-  });
+    console.error(err.stack);
+    return errorResponse(res, err.message || 'Something went wrong', err.statusCode || 500);
 });
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({
-    status: 'error',
-    message: 'Route not found'
-  });
+    return notFoundResponse(res);
 });
 
-app.listen(3000, () => {
-  console.log("Server is running on port 3000");
+// Start server
+app.listen(config.server.port, () => {
+    console.log(`Server is running in ${config.server.env} mode on port ${config.server.port}`);
 });

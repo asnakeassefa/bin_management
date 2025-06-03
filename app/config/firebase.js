@@ -1,19 +1,15 @@
 import admin from 'firebase-admin';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { readFileSync } from 'fs';
+import config from './config.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Load the service account key file
-const serviceAccount = JSON.parse(
-  readFileSync(join(__dirname, '../../firebase-service-account.json'), 'utf8')
-);
-
-// Initialize Firebase Admin
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+// Initialize Firebase Admin if Firebase config is provided
+if (config.firebase.projectId && config.firebase.privateKey && config.firebase.clientEmail) {
+    admin.initializeApp({
+        credential: admin.credential.cert({
+            projectId: config.firebase.projectId,
+            privateKey: config.firebase.privateKey,
+            clientEmail: config.firebase.clientEmail
+        })
+    });
+}
 
 export const messaging = admin.messaging(); 

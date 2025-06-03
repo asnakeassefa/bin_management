@@ -3,6 +3,7 @@ import { Op } from 'sequelize';
 import { addDays, addHours, format, isSameDay, isAfter, isBefore, setHours, setMinutes } from 'date-fns';
 import nodemailer from 'nodemailer';
 import { messaging } from '../config/firebase.js';
+import { findNextNonHolidayDate } from '../utils/holidayUtils.js';
 
 // Helper function to check if current time is around 6 PM or 6 AM
 function isNotificationTime() {
@@ -67,21 +68,47 @@ export async function checkUpcomingCollections() {
       },
       include: [{
         model: User,
-        attributes: ['email', 'name', 'deviceToken']
+        attributes: ['id', 'email', 'country'],
+        where: {
+          isActive: true
+        }
       }]
     });
 
     // Filter bins that need notification based on timing
     const binsToNotifyNow = binsToNotify.filter(shouldNotifyBin);
 
-    // Send notifications
+    // Send notifications and update collection dates
     for (const bin of binsToNotifyNow) {
       if (bin.User.deviceToken) {
+        // Send notification
         await sendPushNotification(bin);
         
         // Update last notification time
         await bin.update({
           lastNotificationTime: new Date()
+        });
+
+        // Calculate and update next collection date
+        const currentDate = new Date();
+        const initialNextDate = addDays(currentDate, bin.collectionInterval);
+        
+        // Find next non-holiday date
+        const nextCollectionDate = await findNextNonHolidayDate(
+          initialNextDate,
+          bin.User.country
+        );
+
+        // Update the bin with new collection dates
+        await bin.update({
+          lastCollectionDate: currentDate,
+          nextCollectionDate: nextCollectionDate
+        });
+
+        console.log(`Updated collection dates for bin ${bin.id}:`, {
+          lastCollectionDate: currentDate,
+          nextCollectionDate: nextCollectionDate,
+          binType: bin.binType
         });
       }
     }

@@ -6,17 +6,22 @@
   "scripts": {
     "start": "nodemon app.js",
     "dev": "nodemon app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "setup": "node scripts/setup-env.js",
+    "setup:prod": "NODE_ENV=production node scripts/setup-env.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
     "date-fns": "^4.1.0",
+    "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "firebase-admin": "^13.4.0",
+    "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.16.0",
     "pg-hstore": "^2.3.4",

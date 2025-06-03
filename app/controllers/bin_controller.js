@@ -1,6 +1,14 @@
 import { User, UserBin } from "../models/index.js";
 import { Op } from "sequelize";
 import { addDays, format } from "date-fns";
+import { 
+    successResponse, 
+    errorResponse, 
+    createdResponse, 
+    notFoundResponse, 
+    badRequestResponse 
+} from "../utils/responseHandler.js";
+import { findNextNonHolidayDate } from "../utils/holidayUtils.js";
 
 // Add a new bin for user
 export async function addUserBin(req, res) {
@@ -18,10 +26,7 @@ export async function addUserBin(req, res) {
   try {
     // Validate bin type
     if (!["recycle", "garden", "general"].includes(binType)) {
-      return res.status(400).json({
-        status: "error",
-        message: "Invalid bin type. Must be one of: recycle, garden, general",
-      });
+      return badRequestResponse(res, "Invalid bin type. Must be one of: recycle, garden, general");
     }
 
     // Check if user already has this bin type
@@ -32,100 +37,61 @@ export async function addUserBin(req, res) {
       },
     });
     if (existingBin) {
-      return res.status(400).json({
-        status: "error",
-        message: `User already has a ${binType} bin`,
-      });
+      return badRequestResponse(res, `User already has a ${binType} bin`);
     }
+
     // Validate last collection date
     if (!lastCollectionDate || isNaN(new Date(lastCollectionDate))) {
-      return res.status(400).json({
-        status: "error",
-        message: "Invalid last collection date",
-      });
+      return badRequestResponse(res, "Invalid last collection date");
     }
+
     // Validate collection interval
-    if (
-      !collectionInterval ||
-      isNaN(collectionInterval) ||
-      collectionInterval <= 0
-    ) {
-      return res.status(400).json({
-        status: "error",
-        message: "Collection interval must be a positive number",
-      });
+    if (!collectionInterval || isNaN(collectionInterval) || collectionInterval <= 0) {
+      return badRequestResponse(res, "Collection interval must be a positive number");
     }
+
     // Validate notify days before
     if (notifyDaysBefore && (isNaN(notifyDaysBefore) || notifyDaysBefore < 0)) {
-      return res.status(400).json({
-        status: "error",
-        message: "Notify days before must be a non-negative number",
-      });
+      return badRequestResponse(res, "Notify days before must be a non-negative number");
     }
+
     // Validate colors
-    if (
-      !/^#[0-9A-F]{6}$/i.test(bodyColor) ||
-      !/^#[0-9A-F]{6}$/i.test(headColor)
-    ) {
-      return res.status(400).json({
-        status: "error",
-        message: "Body and head colors must be valid hex color codes",
-      });
+    if (!/^#[0-9A-F]{6}$/i.test(bodyColor) || !/^#[0-9A-F]{6}$/i.test(headColor)) {
+      return badRequestResponse(res, "Body and head colors must be valid hex color codes");
     }
+
     // Check if last collection date is in the future
     if (new Date(lastCollectionDate) > new Date()) {
-      return res.status(400).json({
-        status: "error",
-        message: "Last collection date cannot be in the future",
-      });
+      return badRequestResponse(res, "Last collection date cannot be in the future");
     }
+
     // Check if collection interval is valid
     if (collectionInterval <= 0) {
-      return res.status(400).json({
-        status: "error",
-        message: "Collection interval must be a positive number",
-      });
+      return badRequestResponse(res, "Collection interval must be a positive number");
     }
+
     // check that the last collection date is not 30 days in the past
     const thirtyDaysAgo = addDays(new Date(), -30);
     if (new Date(lastCollectionDate) < thirtyDaysAgo) {
-      return res.status(400).json({
-        status: "error",
-        message: "Last collection date cannot be more than 30 days in the past",
-      });
+      return badRequestResponse(res, "Last collection date cannot be more than 30 days in the past");
     }
 
     // check if last collection date + collection interval is not in the past
-    const lastCollectionWithInterval = addDays(
-      new Date(lastCollectionDate),
-      collectionInterval
-    );
+    const lastCollectionWithInterval = addDays(new Date(lastCollectionDate), collectionInterval);
     if (lastCollectionWithInterval < new Date()) {
-      return res.status(400).json({
-        status: "error",
-        message:
-          "Last collection date plus collection interval cannot be in the past",
-      });
-    }
-    // Check if notify days before is valid
-    if (notifyDaysBefore && notifyDaysBefore < 0) {
-      return res.status(400).json({
-        status: "error",
-        message: "Notify days before must be a non-negative number",
-      });
-    }
-    // Check if last collection date is before today
-    if (new Date(lastCollectionDate) < new Date()) {
-      return res.status(400).json({
-        status: "error",
-        message: "Last collection date cannot be in the past",
-      });
+      return badRequestResponse(res, "Last collection date plus collection interval cannot be in the past");
     }
 
-    // Calculate next collection date
-    const nextCollectionDate = addDays(
-      new Date(lastCollectionDate),
-      collectionInterval
+    // Check if notify days before is valid
+    if (notifyDaysBefore && notifyDaysBefore < 0) {
+      return badRequestResponse(res, "Notify days before must be a non-negative number");
+    }
+
+    // Calculate next collection date, skipping holidays
+    const initialNextDate = addDays(new Date(lastCollectionDate), collectionInterval);
+    const nextCollectionDate = await findNextNonHolidayDate(
+      initialNextDate,
+      req.user.country
     );
 
     // Create user bin
@@ -140,18 +106,11 @@ export async function addUserBin(req, res) {
       notifyDaysBefore: notifyDaysBefore || 1,
     });
 
-    res.status(201).json({
-      status: "success",
-      data: userBin,
-    });
+    return createdResponse(res, userBin);
   } catch (error) {
-    res.status(400).json({
-      status: "error",
-      message: error.message,
-    });
+    return errorResponse(res, error.message);
   }
 }
-
 // Update bin collection schedule
 export async function updateBinSchedule(req, res) {
   const { id } = req.params;
@@ -164,112 +123,75 @@ export async function updateBinSchedule(req, res) {
     });
 
     if (!userBin) {
-      return res.status(404).json({
-        status: "error",
-        message: "Bin not found",
-      });
+      return notFoundResponse(res, "Bin not found");
     }
+
     // Validate last collection date
     if (!lastCollectionDate || isNaN(new Date(lastCollectionDate))) {
-      return res.status(400).json({
-        status: "error",
-        message: "Invalid last collection date",
-      });
+      return badRequestResponse(res, "Invalid last collection date");
     }
 
     // Validate collection interval
-    if (
-      !collectionInterval ||
-      isNaN(collectionInterval) ||
-      collectionInterval <= 0
-    ) {
-      return res.status(400).json({
-        status: "error",
-        message: "Collection interval must be a positive number",
-      });
+    if (!collectionInterval || isNaN(collectionInterval) || collectionInterval <= 0) {
+      return badRequestResponse(res, "Collection interval must be a positive number");
     }
+
     // Check if last collection date is in the future
     if (new Date(lastCollectionDate) > new Date()) {
-      return res.status(400).json({
-        status: "error",
-        message: "Last collection date cannot be in the future",
-      });
+      return badRequestResponse(res, "Last collection date cannot be in the future");
     }
+
     // Check if collection interval is valid
     if (collectionInterval <= 0) {
-      return res.status(400).json({
-        status: "error",
-        message: "Collection interval must be a positive number",
-      });
+      return badRequestResponse(res, "Collection interval must be a positive number");
     }
+
     // check that the last collection date is not 30 days in the past
     const thirtyDaysAgo = addDays(new Date(), -30);
     if (new Date(lastCollectionDate) < thirtyDaysAgo) {
-      return res.status(400).json({
-        status: "error",
-        message: "Last collection date cannot be more than 30 days in the past",
-      });
+      return badRequestResponse(res, "Last collection date cannot be more than 30 days in the past");
     }
+
     // check if the last collection date + collection interval is not in the past
-    const lastCollectionWithInterval = addDays(
-      new Date(lastCollectionDate),
-      collectionInterval
-    );
+    const lastCollectionWithInterval = addDays(new Date(lastCollectionDate), collectionInterval);
     if (lastCollectionWithInterval < new Date()) {
-      return res.status(400).json({
-        status: "error",
-        message:
-          "Last collection date plus collection interval cannot be in the past",
-      });
+      return badRequestResponse(res, "Last collection date plus collection interval cannot be in the past");
     }
 
     // Check if last collection date is before next collection date
     if (new Date(lastCollectionDate) >= new Date(userBin.nextCollectionDate)) {
-      return res.status(400).json({
-        status: "error",
-        message:
-          "Last collection date must be before the current next collection date",
-      });
+      return badRequestResponse(res, "Last collection date must be before the current next collection date");
     }
+
     // Check if collection interval is less than the difference between last and next collection dates
     const currentNextCollectionDate = new Date(userBin.nextCollectionDate);
-
     const daysDifference = Math.ceil(
-      (currentNextCollectionDate - new Date(lastCollectionDate)) /
-        (1000 * 60 * 60 * 24)
+      (currentNextCollectionDate - new Date(lastCollectionDate)) / (1000 * 60 * 60 * 24)
     );
     if (collectionInterval < daysDifference) {
-      return res.status(400).json({
-        status: "error",
-        message:
-          "Collection interval must be greater than or equal to the difference between last and next collection dates",
-      });
+      return badRequestResponse(res, "Collection interval must be greater than or equal to the difference between last and next collection dates");
     }
 
     // Update collection schedule
+    const initialNextDate = addDays(new Date(lastCollectionDate), collectionInterval);
+    const nextCollectionDate = await findNextNonHolidayDate(
+      initialNextDate,
+      req.user.country
+    );
+
     const updates = {
       lastCollectionDate,
       collectionInterval,
-      nextCollectionDate: addDays(
-        new Date(lastCollectionDate),
-        collectionInterval
-      ),
+      nextCollectionDate,
     };
 
     await userBin.update(updates);
 
-    res.json({
-      status: "success",
-      data: userBin,
-    });
+    return successResponse(res, userBin);
   } catch (error) {
-    res.status(400).json({
-      status: "error",
-      message: error.message,
-    });
+    return errorResponse(res, error.message);
   }
 }
-
 // Update bin appearance
 export async function updateBinAppearance(req, res) {
   const { id } = req.params;
@@ -282,34 +204,20 @@ export async function updateBinAppearance(req, res) {
     });
 
     if (!userBin) {
-      return res.status(404).json({
-        status: "error",
-        message: "Bin not found",
-      });
+      return notFoundResponse(res, "Bin not found");
     }
+
     // check they are not number and are valid hex colors
-    if (
-      !/^#[0-9A-F]{6}$/i.test(bodyColor) ||
-      !/^#[0-9A-F]{6}$/i.test(headColor)
-    ) {
-      return res.status(400).json({
-        status: "error",
-        message: "Body and head colors must be valid hex color codes",
-      });
+    if (!/^#[0-9A-F]{6}$/i.test(bodyColor) || !/^#[0-9A-F]{6}$/i.test(headColor)) {
+      return badRequestResponse(res, "Body and head colors must be valid hex color codes");
     }
+
     await userBin.update({ bodyColor, headColor });
-    res.json({
-      status: "success",
-      data: userBin,
-    });
+    return successResponse(res, userBin);
   } catch (error) {
-    res.status(400).json({
-      status: "error",
-      message: error.message,
-    });
+    return errorResponse(res, error.message);
   }
 }
-
 // Get user's bins
 export async function getUserBins(req, res) {
   const userId = req.user.id;
@@ -320,18 +228,11 @@ export async function getUserBins(req, res) {
       order: [["nextCollectionDate", "ASC"]],
     });
 
-    res.json({
-      status: "success",
-      data: userBins,
-    });
+    return successResponse(res, userBins);
   } catch (error) {
-    res.status(400).json({
-      status: "error",
-      message: error.message,
-    });
+    return errorResponse(res, error.message);
   }
 }
-
 // Get upcoming collections
 export async function getUpcomingCollections(req, res) {
   const userId = req.user.id;
@@ -354,21 +255,13 @@ export async function getUpcomingCollections(req, res) {
     const formattedCollections = upcomingCollections.map((bin) => ({
       binType: bin.binType,
       nextCollectionDate: format(bin.nextCollectionDate, "yyyy-MM-dd"),
-      daysUntil: Math.ceil(
-        (bin.nextCollectionDate - new Date()) / (1000 * 60 * 60 * 24)
-      ),
+      daysUntil: Math.ceil((bin.nextCollectionDate - new Date()) / (1000 * 60 * 60 * 24)),
       bodyColor: bin.bodyColor,
       headColor: bin.headColor,
     }));
 
-    res.json({
-      status: "success",
-      data: formattedCollections,
-    });
+    return successResponse(res, formattedCollections);
   } catch (error) {
-    res.status(400).json({
-      status: "error",
-      message: error.message,
-    });
+    return errorResponse(res, error.message);
   }
 }
