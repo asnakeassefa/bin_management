@@ -5,6 +5,7 @@ import binRoutes from "./app/routes/bin_routes.js";
 import countryRoutes from "./app/routes/country_routes.js";
 import userRoutes from './app/routes/user_routes.js';
 import config from './app/config/config.js';
+import './app/cron/collection_cron.js';
 
 const app = express();
 

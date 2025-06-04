@@ -1,7 +1,6 @@
 import { UserBin, User } from '../models/index.js';
 import { Op } from 'sequelize';
 import { addDays, addHours, format, isSameDay, isAfter, isBefore, setHours, setMinutes } from 'date-fns';
-import nodemailer from 'nodemailer';
 import { messaging } from '../config/firebase.js';
 import { findNextNonHolidayDate } from '../utils/holidayUtils.js';
 
@@ -169,7 +168,6 @@ async function sendPushNotification(bin) {
     console.log('Successfully sent notification:', response);
   } catch (error) {
     console.error('Error sending notification:', error);
-    
     // If the token is invalid, remove it from the user
     if (error.code === 'messaging/invalid-registration-token' ||
         error.code === 'messaging/registration-token-not-registered') {
@@ -177,4 +175,4 @@ async function sendPushNotification(bin) {
       console.log('Removed invalid device token for user:', user.id);
     }
   }
-} 
+}

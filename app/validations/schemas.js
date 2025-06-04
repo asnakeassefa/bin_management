@@ -5,7 +5,7 @@ import { UK_COUNTRIES } from './country_schemas.js';
 const patterns = {
   hexColor: /^#[0-9A-F]{6}$/i,
   username: /^[a-zA-Z0-9_]{3,30}$/,
-  password: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/,
+  password: /^.{8,}$/,
 };
 
 // Auth validation schemas
