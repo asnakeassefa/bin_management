@@ -70,12 +70,18 @@ const config = {
     // Email configuration
     email: {
         smtp: {
-            host: process.env.SMTP_HOST,
-            port: parseInt(process.env.SMTP_PORT, 10),
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: parseInt(process.env.SMTP_PORT, 10) || 587,
+            secure: process.env.SMTP_SECURE === 'true'|| false, // true for 465, false for other ports
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS
+            }
         },
-        from: process.env.EMAIL_FROM
+        from: {
+            name: process.env.EMAIL_FROM_NAME || 'Bin Collection App',
+            email: process.env.EMAIL_FROM_EMAIL || process.env.SMTP_USER
+        }
     },
 
     // Firebase configuration

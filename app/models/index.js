@@ -5,6 +5,7 @@ import binTypeModel from "./bin_type_model.js";
 import userBinModel from "./user_bin_model.js";
 import countryModel from "./country_model.js";
 import holidayModel from "./holiday_model.js";
+import otpModel from "./otp_model.js";
 
 const sequelize = new Sequelize(
   config.database.name,
@@ -36,17 +37,20 @@ db.BinType = binTypeModel(sequelize, Sequelize);
 db.UserBin = userBinModel(sequelize, Sequelize);
 db.Country = countryModel(sequelize, Sequelize);
 db.Holiday = holidayModel(sequelize, Sequelize);
+db.OTP = otpModel(sequelize, Sequelize);
 
 // Define associations
 db.User.hasMany(db.UserBin, { foreignKey: "userId" });
 db.UserBin.belongsTo(db.User, { foreignKey: "userId" });
 
-db.Country.hasMany(db.Holiday, { foreignKey: "countryCode" });
-db.Holiday.belongsTo(db.Country, { foreignKey: "countryCode" });
+// db.Country.hasMany(db.Holiday, { foreignKey: "countryCode" });
+// db.Holiday.belongsTo(db.Country, { foreignKey: "countryCode" });
 
-db.User.belongsTo(db.Country, { foreignKey: "country", targetKey: "code" });
-db.Country.hasMany(db.User, { foreignKey: "country", sourceKey: "code" });
+// db.User.belongsTo(db.Country, { foreignKey: "country", targetKey: "code" });
+// db.Country.hasMany(db.User, { foreignKey: "country", sourceKey: "code" });
 
+db.User.hasMany(db.OTP, { foreignKey: "userId" });
+db.OTP.belongsTo(db.User, { foreignKey: "userId" });
 // Test database connection
 sequelize
   .authenticate()
@@ -68,4 +72,4 @@ sequelize
   });
 
 export default db;
-export const { User, BinType, UserBin, Country, Holiday } = db;
+export const { User, BinType, UserBin, Country, Holiday, OTP } = db;

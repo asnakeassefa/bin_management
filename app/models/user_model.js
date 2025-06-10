@@ -40,6 +40,12 @@ export default (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: false,
       comment: 'Whether the user has admin privileges'
+    },
+    isEmailVerified: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      comment: 'Whether the user has verified their email address'
     }
   });
 };

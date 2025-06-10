@@ -13,8 +13,8 @@ cron.schedule('0 20 * * *', async () => {
   await checkUpcomingCollections();
 });
 
-// Run every minutes for testing purposes
-cron.schedule('* * * * *', async () => {
-  console.log('Checking for upcoming bin collections (every minute for testing)...');
-  await checkUpcomingCollections();
-});
+// // Run every minutes for testing purposes
+// cron.schedule('* * * * *', async () => {
+//   console.log('Checking for upcoming bin collections (every minute for testing)...');
+//   await checkUpcomingCollections();
+// });

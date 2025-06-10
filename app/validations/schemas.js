@@ -63,9 +63,52 @@ export const authSchemas = {
     }),
   }),
 
+  logout: Joi.object({
+    refreshToken: Joi.string().required().messages({
+      "string.empty": "Refresh token is required",
+    }),
+  }),
+
+  sendVerification: Joi.object({
+    email: Joi.string().email().required().messages({
+      "string.email": "Please provide a valid email address",
+      "string.empty": "Email is required",
+    }),
+  }),
+
+  verifyEmail: Joi.object({
+    email: Joi.string().email().required().messages({
+      "string.email": "Please provide a valid email address",
+      "string.empty": "Email is required",
+    }),
+    code: Joi.string().length(6).required().messages({
+      "string.length": "Verification code must be 6 digits",
+      "string.empty": "Verification code is required",
+    }),
+  }),
+
+  resendVerification: Joi.object({
+    email: Joi.string().email().required().messages({
+      "string.email": "Please provide a valid email address",
+      "string.empty": "Email is required",
+    }),
+  }),
+
+  resendPasswordReset: Joi.object({
+    email: Joi.string().email().required().messages({
+      "string.email": "Please provide a valid email address",
+      "string.empty": "Email is required",
+    }),
+  }),
+
   resetPassword: Joi.object({
-    token: Joi.string().required().messages({
-      "string.empty": "Reset token is required",
+    email: Joi.string().email().required().messages({
+      "string.email": "Please provide a valid email address",
+      "string.empty": "Email is required",
+    }),
+    code: Joi.string().length(6).required().messages({
+      "string.length": "Reset code must be 6 digits",
+      "string.empty": "Reset code is required",
     }),
     newPassword: Joi.string().pattern(patterns.password).required().messages({
       "string.pattern.base":
