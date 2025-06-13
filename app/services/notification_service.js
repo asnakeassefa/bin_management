@@ -1,20 +1,29 @@
-import { UserBin, User } from '../models/index.js';
-import { Op } from 'sequelize';
-import { addDays, addHours, format, isSameDay, isAfter, isBefore, setHours, setMinutes } from 'date-fns';
-import { messaging } from '../config/firebase.js';
-import { findNextNonHolidayDate } from '../utils/holidayUtils.js';
+import { UserBin, User } from "../models/index.js";
+import { Op } from "sequelize";
+import {
+  addDays,
+  addHours,
+  format,
+  isSameDay,
+  isAfter,
+  isBefore,
+  setHours,
+  setMinutes,
+} from "date-fns";
+import { messaging } from "../config/firebase.js";
+import { findNextNonHolidayDate } from "../utils/holidayUtils.js";
 
 // Helper function to check if current time is around 6 PM or 6 AM
 function isNotificationTime() {
   const now = new Date();
   const sixPM = setHours(setMinutes(now, 0), 18); // 6:00 PM
-  const sixAM = setHours(setMinutes(now, 0), 6);  // 6:00 AM
-  
+  const sixAM = setHours(setMinutes(now, 0), 6); // 6:00 AM
+
   // Check if current time is within 5 minutes of 6 PM or 6 AM
   const fiveMinutes = 5 * 60 * 1000; // 5 minutes in milliseconds
   return (
-    (Math.abs(now - sixPM) <= fiveMinutes) || // Around 6 PM
-    (Math.abs(now - sixAM) <= fiveMinutes)    // Around 6 AM
+    Math.abs(now - sixPM) <= fiveMinutes || // Around 6 PM
+    Math.abs(now - sixAM) <= fiveMinutes // Around 6 AM
   );
 }
 
@@ -23,28 +32,32 @@ function shouldNotifyBin(bin) {
   const now = new Date();
   const tomorrow = addDays(now, 1);
   const nextCollectionDate = new Date(bin.nextCollectionDate);
-  
+
   // Check if collection is tomorrow
   const isCollectionTomorrow = isSameDay(nextCollectionDate, tomorrow);
-  
+
   // Get the last notification time for this bin
   const lastNotification = bin.lastNotificationTime;
-  
+
   if (!isCollectionTomorrow) return false;
-  
+
   // If no previous notification, notify at 6 PM
   if (!lastNotification) {
-    return isNotificationTime() && isAfter(now, setHours(setMinutes(now, 0), 12)); // After 12 PM
+    return (
+      isNotificationTime() && isAfter(now, setHours(setMinutes(now, 0), 12))
+    ); // After 12 PM
   }
-  
+
   // If already notified at 6 PM, notify again at 6 AM next day
   const lastNotificationDate = new Date(lastNotification);
   const isLastNotificationPM = lastNotificationDate.getHours() >= 18;
-  
+
   if (isLastNotificationPM) {
-    return isNotificationTime() && isBefore(now, setHours(setMinutes(now, 0), 12)); // Before 12 PM
+    return (
+      isNotificationTime() && isBefore(now, setHours(setMinutes(now, 0), 12))
+    ); // Before 12 PM
   }
-  
+
   return false;
 }
 
@@ -56,22 +69,24 @@ export async function checkUpcomingCollections() {
     }
 
     const tomorrow = addDays(new Date(), 1);
-    
+
     // Find bins that need notification
     const binsToNotify = await UserBin.findAll({
       where: {
         notificationEnabled: true,
         nextCollectionDate: {
-          [Op.between]: [tomorrow, addDays(tomorrow, 1)]
-        }
+          [Op.between]: [tomorrow, addDays(tomorrow, 1)],
+        },
       },
-      include: [{
-        model: User,
-        attributes: ['id', 'email', 'country'],
-        where: {
-          isActive: true
-        }
-      }]
+      include: [
+        {
+          model: User,
+          attributes: ["id", "email", "country"],
+          where: {
+            isActive: true,
+          },
+        },
+      ],
     });
 
     // Filter bins that need notification based on timing
@@ -82,16 +97,16 @@ export async function checkUpcomingCollections() {
       if (bin.User.deviceToken) {
         // Send notification
         await sendPushNotification(bin);
-        
+
         // Update last notification time
         await bin.update({
-          lastNotificationTime: new Date()
+          lastNotificationTime: new Date(),
         });
 
         // Calculate and update next collection date
         const currentDate = new Date();
         const initialNextDate = addDays(currentDate, bin.collectionInterval);
-        
+
         // Find next non-holiday date
         const nextCollectionDate = await findNextNonHolidayDate(
           initialNextDate,
@@ -101,78 +116,111 @@ export async function checkUpcomingCollections() {
         // Update the bin with new collection dates
         await bin.update({
           lastCollectionDate: currentDate,
-          nextCollectionDate: nextCollectionDate
+          nextCollectionDate: nextCollectionDate,
         });
 
         console.log(`Updated collection dates for bin ${bin.id}:`, {
           lastCollectionDate: currentDate,
           nextCollectionDate: nextCollectionDate,
-          binType: bin.binType
+          binType: bin.binType,
         });
       }
     }
   } catch (error) {
-    console.error('Error checking collections:', error);
+    console.error("Error checking collections:", error);
   }
 }
 
-async function sendPushNotification(bin) {
+export async function sendPushNotification(bin) {
   const { User: user } = bin;
   const now = new Date();
   const isMorning = now.getHours() < 12;
-  
+
   // Prepare notification message based on time of day
-  const timeOfDay = isMorning ? 'morning' : 'evening';
+  const timeOfDay = isMorning ? "morning" : "evening";
   const title = `Bin Collection Reminder`;
-  const body = isMorning 
+  const body = isMorning
     ? `Final reminder: Your ${bin.binType} bin will be collected today!`
     : `Your ${bin.binType} bin will be collected tomorrow.`;
 
   // Prepare the notification payload
+  // const message = {
+  //   token: user.deviceToken,
+  //   notification: {
+  //     title: title,
+  //     body: body
+  //   },
+  //   data: {
+  //     binType: bin.binType,
+  //     bodyColor: bin.bodyColor,
+  //     headColor: bin.headColor,
+  //     collectionDate: bin.nextCollectionDate.toISOString(),
+  //     type: 'collection_reminder'
+  //   },
+  //   android: {
+  //     priority: 'high',
+  //     notification: {
+  //       channelId: 'bin_collections',
+  //       sound: 'default',
+  //       priority: 'high',
+  //       importance: 'high',
+  //       clickAction: 'FLUTTER_NOTIFICATION_CLICK'
+  //     }
+  //   },
+  //   apns: {
+  //     payload: {
+  //       aps: {
+  //         sound: 'default',
+  //         badge: 1
+  //       }
+  //     }
+  //   }
+  // };
   const message = {
     token: user.deviceToken,
     notification: {
       title: title,
-      body: body
+      body: body,
     },
     data: {
-      binType: bin.binType,
-      bodyColor: bin.bodyColor,
-      headColor: bin.headColor,
-      collectionDate: bin.nextCollectionDate.toISOString(),
-      type: 'collection_reminder'
+      // binType: bin.binType,
+      // bodyColor: bin.bodyColor,
+      // headColor: bin.headColor,
+      // collectionDate: bin.nextCollectionDate.toISOString(),
+      // type: "collection_reminder",
     },
     android: {
-      priority: 'high',
+      priority: "high",
       notification: {
-        channelId: 'bin_collections',
-        sound: 'default',
-        priority: 'high',
-        importance: 'high',
-        clickAction: 'FLUTTER_NOTIFICATION_CLICK'
-      }
+        channelId: "bin_collections",
+        sound: "default",
+        priority: "high",
+        clickAction: "FLUTTER_NOTIFICATION_CLICK",
+      },
     },
     apns: {
       payload: {
         aps: {
-          sound: 'default',
-          badge: 1
-        }
-      }
-    }
+          sound: "default",
+          badge: 1,
+        },
+      },
+    },
   };
 
   try {
     // Send the notification
     const response = await messaging.send(message);
-    console.log('Successfully sent notification:', response);
+    console.log("Successfully sent notification:", response);
   } catch (error) {
-    console.error('Error sending notification:', error);
+    console.error("Error sending notification:", error);
     // If the token is invalid, remove it from the user
-    if (error.code === 'messaging/invalid-registration-token' ||
-        error.code === 'messaging/registration-token-not-registered') {
+    if (
+      error.code === "messaging/invalid-registration-token" ||
+      error.code === "messaging/registration-token-not-registered"
+    ) {
       await user.update({ deviceToken: null });
-      console.log('Removed invalid device token for user:', user.id);
+      console.log("Removed invalid device token for user:", user.id);
     }
   }
 }
