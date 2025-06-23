@@ -62,14 +62,15 @@ sequelize
   });
 
 // Sync all models with database
-sequelize
-  .sync() // Set to true to drop tables on each sync
-  .then(() => {
-    console.log("Database & tables created!");
-  })
-  .catch((err) => {
-    console.error("Error syncing database:", err);
-  });
+// sequelize
+//   // .sync({ force: true }) // Set to true to drop tables on each sync
+//   .sync()
+//   .then(() => {
+//     console.log("Database & tables created!");
+//   })
+//   .catch((err) => {
+//     console.error("Error syncing database:", err);
+//   });
 
 export default db;
 export const { User, BinType, UserBin, Country, Holiday, OTP } = db;

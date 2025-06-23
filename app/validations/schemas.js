@@ -4,8 +4,7 @@ import { UK_COUNTRIES } from './country_schemas.js';
 // Common validation patterns
 const patterns = {
   hexColor: /^#[0-9A-F]{6}$/i,
-  username: /^[a-zA-Z0-9_]{3,30}$/,
-  password: /^.{8,}$/,
+  password: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/,
 };
 
 // Auth validation schemas
@@ -16,21 +15,16 @@ export const authSchemas = {
       "string.min": "Full name must be at least 2 characters long",
       "string.max": "Full name cannot exceed 50 characters",
     }),
-    username: Joi.string().pattern(patterns.username).required().messages({
-      "string.pattern.base":
-        "Username must be 3-30 characters and can only contain letters, numbers, and underscores",
-      "string.empty": "Username is required",
-    }),
     email: Joi.string().email().required().messages({
       "string.email": "Please provide a valid email address",
       "string.empty": "Email is required",
     }),
     password: Joi.string()
-      .pattern(/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/)
+      .pattern(patterns.password)
       .required()
       .messages({
         "string.pattern.base":
-          "Password must be at least 8 characters long and contain at least one letter and one number",
+          "Password must be at least 8 characters long, contain at least one letter, one number.",
         "string.empty": "Password is required",
       }),
     country: Joi.string()
@@ -112,7 +106,7 @@ export const authSchemas = {
     }),
     newPassword: Joi.string().pattern(patterns.password).required().messages({
       "string.pattern.base":
-        "Password must be at least 8 characters long and contain at least one letter and one number",
+        "Password must be at least 8 characters long, contain at least one letter, one number, and may contain special characters (@$!%*?&).",
       "string.empty": "New password is required",
     }),
   }),
@@ -198,16 +192,12 @@ export const userSchemas = {
             "string.min": "Full name must be at least 2 characters long",
             "string.max": "Full name cannot exceed 50 characters",
         }),
-        username: Joi.string().pattern(patterns.username).required().messages({
-            "string.pattern.base": "Username must be 3-30 characters and can only contain letters, numbers, and underscores",
-            "string.empty": "Username is required",
-        }),
         email: Joi.string().email().required().messages({
             "string.email": "Please provide a valid email address",
             "string.empty": "Email is required",
         }),
         password: Joi.string().pattern(patterns.password).required().messages({
-            "string.pattern.base": "Password must be at least 8 characters long and contain at least one letter and one number",
+            "string.pattern.base": "Password must be at least 8 characters long, contain at least one letter, one number.",
             "string.empty": "Password is required",
         }),
         country: Joi.string()
@@ -224,9 +214,6 @@ export const userSchemas = {
         fullName: Joi.string().min(2).max(50).messages({
             "string.min": "Full name must be at least 2 characters long",
             "string.max": "Full name cannot exceed 50 characters",
-        }),
-        username: Joi.string().pattern(patterns.username).messages({
-            "string.pattern.base": "Username must be 3-30 characters and can only contain letters, numbers, and underscores",
         }),
         email: Joi.string().email().messages({
             "string.email": "Please provide a valid email address",

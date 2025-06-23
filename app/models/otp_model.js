@@ -29,5 +29,7 @@ export default (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         defaultValue: 0,
       },
+    }, {
+      tableName: 'OTP'
     });
   };

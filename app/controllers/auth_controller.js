@@ -93,7 +93,7 @@ export async function login(req, res) {
 
 // Register controller
 export async function register(req, res) {
-  const { fullName, username, email, password, country, adminToken } = req.body;
+  const { fullName, email, password, country, adminToken } = req.body;
   try {
     // Check if this is the first user (to be made admin)
     const userCount = await User.count();
@@ -111,12 +111,12 @@ export async function register(req, res) {
     // Check for existing user
     const existingUser = await User.findOne({
       where: {
-        [Op.or]: [{ email }, { username }],
+        email
       },
     });
 
     if (existingUser) {
-      return badRequestResponse(res, "Email or username already registered");
+      return badRequestResponse(res, "Email already registered");
     }
 
     // Determine if user should be admin
@@ -138,7 +138,6 @@ export async function register(req, res) {
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = await User.create({
       fullName,
-      username,
       email,
       password: hashedPassword,
       country: upperCode,
@@ -297,7 +296,7 @@ export async function verifyEmail(req, res) {
         expiresAt: { [Op.gt]: new Date() },
       },
     });
-
+    
     if (!otp) {
       // Increment attempts if OTP exists but is invalid
       const existingOtp = await OTP.findOne({

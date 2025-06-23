@@ -13,7 +13,7 @@ import { UK_COUNTRIES } from '../validations/country_schemas.js';
 export const userController = {
     // Create a new user (admin only)
     async createUser(req, res) {
-        const { fullName, username, email, password, country, isAdmin } = req.body;
+        const { fullName, email, password, country, isAdmin } = req.body;
         try {
             // Validate country code
             const upperCode = country.toUpperCase();
@@ -23,18 +23,17 @@ export const userController = {
 
             const existingUser = await User.findOne({ 
                 where: { 
-                    [Op.or]: [{ email }, { username }] 
+                    email
                 } 
             });
             
             if (existingUser) {
-                return badRequestResponse(res, "Email or username already registered");
+                return badRequestResponse(res, "Email already registered");
             }
 
             const hashedPassword = await bcrypt.hash(password, 10);
             const newUser = await User.create({
                 fullName,
-                username,
                 email,
                 password: hashedPassword,
                 country: upperCode,
@@ -73,7 +72,7 @@ export const userController = {
     // Update user (admin only)
     async updateUser(req, res) {
         const { userId } = req.params;
-        const { fullName, username, email, country, isAdmin } = req.body;
+        const { fullName, email, country, isAdmin } = req.body;
         try {
             const user = await User.findByPk(userId);
             if (!user) {
@@ -89,24 +88,20 @@ export const userController = {
             }
 
             // Check for duplicate email/username if updating
-            if (email || username) {
+            if (email) {
                 const existingUser = await User.findOne({
                     where: {
-                        [Op.or]: [
-                            email ? { email } : {},
-                            username ? { username } : {}
-                        ],
+                        email,
                         id: { [Op.ne]: userId }
                     }
                 });
                 if (existingUser) {
-                    return badRequestResponse(res, 'Email or username already in use');
+                    return badRequestResponse(res, 'Email already in use');
                 }
             }
 
             await user.update({
                 fullName: fullName || user.fullName,
-                username: username || user.username,
                 email: email || user.email,
                 country: country ? country.toUpperCase() : user.country,
                 isAdmin: isAdmin !== undefined ? isAdmin : user.isAdmin
