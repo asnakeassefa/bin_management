@@ -7,6 +7,9 @@ import { userSchemas } from '../validations/schemas.js';
 
 const router = express.Router();
 
+// Route for users to get their own profile
+router.get('/me', authenticateToken, userController.getProfile);
+
 // All routes require authentication and admin privileges
 router.use(authenticateToken);
 router.use(requireAdmin);

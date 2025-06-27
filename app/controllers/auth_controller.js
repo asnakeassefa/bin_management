@@ -202,16 +202,9 @@ export async function refreshToken(req, res) {
     // Generate new tokens
     const tokens = generateTokens(user.id);
 
-    // Update refresh token in database
-    await user.update({
-      refreshToken: tokens.refreshToken,
-      refreshTokenExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    });
-
     return successResponse(res, {
       tokens: {
         accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
       },
     });
   } catch (error) {
@@ -575,6 +568,30 @@ export async function resendPasswordResetOTP(req, res) {
       null,
       "If your email is registered, you will receive a new password reset code"
     );
+  } catch (error) {
+    return errorResponse(res, error.message);
+  }
+}
+
+// Change password controller
+export async function changePassword(req, res) {
+  const { currentPassword, newPassword } = req.body;
+  try {
+    const userId = req.user.id;
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return unauthorizedResponse(res, "User not found");
+    }
+
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+    if (!isValidPassword) {
+      return badRequestResponse(res, "Current password is incorrect");
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await user.update({ password: hashedPassword });
+
+    return successResponse(res, null, "Password changed successfully");
   } catch (error) {
     return errorResponse(res, error.message);
   }

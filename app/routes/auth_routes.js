@@ -9,7 +9,8 @@ import {
     sendVerificationEmail,
     verifyEmail,
     resendVerificationOTP,
-    resendPasswordResetOTP
+    resendPasswordResetOTP,
+    changePassword
 } from "../controllers/auth_controller.js";
 import { validateBody } from "../middleware/validate.js";
 import { authSchemas } from "../validations/schemas.js";
@@ -30,5 +31,8 @@ router.post("/send-verification", validateBody(authSchemas.sendVerification), se
 router.post("/verify-email", validateBody(authSchemas.verifyEmail), verifyEmail);
 router.post("/resend-verification", validateBody(authSchemas.resendVerification), resendVerificationOTP);
 router.post("/resend-password-reset", validateBody(authSchemas.resendPasswordReset), resendPasswordResetOTP);
+
+// Protected route for changing password
+router.patch("/change-password", authenticateToken, changePassword);
 
 export default router;

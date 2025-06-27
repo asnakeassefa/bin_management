@@ -11,6 +11,11 @@ import {
 import { UK_COUNTRIES } from '../validations/country_schemas.js';
 
 export const userController = {
+
+    // create for a uset to get his profile
+    
+
+
     // Create a new user (admin only)
     async createUser(req, res) {
         const { fullName, email, password, country, isAdmin } = req.body;
@@ -137,5 +142,23 @@ export const userController = {
         } catch (error) {
             return errorResponse(res, error.message);
         }
+    },
+
+    // Get the authenticated user's profile
+    async getProfile(req, res) {
+        try {
+            // Assuming req.user is set by authentication middleware
+            const userId = req.user.id;
+            const user = await User.findByPk(userId, {
+                attributes: { exclude: ['password', 'refreshToken', 'refreshTokenExpiry'] }
+            });
+            if (!user) {
+                return notFoundResponse(res, 'User not found');
+            }
+            return successResponse(res, user);
+        } catch (error) {
+            return errorResponse(res, error.message);
+        }
     }
+
 };
