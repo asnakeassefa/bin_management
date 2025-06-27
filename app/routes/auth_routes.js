@@ -33,6 +33,6 @@ router.post("/resend-verification", validateBody(authSchemas.resendVerification)
 router.post("/resend-password-reset", validateBody(authSchemas.resendPasswordReset), resendPasswordResetOTP);
 
 // Protected route for changing password
-router.patch("/change-password", authenticateToken, changePassword);
+router.put("/change-password", authenticateToken, changePassword);
 
 export default router;
