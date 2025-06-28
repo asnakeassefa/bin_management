@@ -21,10 +21,16 @@ const generateOTP = () => {
 
 // Helper function to generate tokens
 const generateTokens = (userId) => {
+  // const accessToken = jwt.sign(
+  //   { userId, tokenType: "access" },
+  //   config.jwt.secret,
+  //   { expiresIn: config.jwt.accessExpiry }
+  // );
+  // make the expire time 5 secon for test purpose.
   const accessToken = jwt.sign(
     { userId, tokenType: "access" },
     config.jwt.secret,
-    { expiresIn: config.jwt.accessExpiry }
+    { expiresIn: "5s" } // For testing purposes, set to 5 seconds
   );
 
   const refreshToken = jwt.sign(
@@ -111,7 +117,7 @@ export async function register(req, res) {
     // Check for existing user
     const existingUser = await User.findOne({
       where: {
-        email
+        email,
       },
     });
 
@@ -158,7 +164,7 @@ export async function register(req, res) {
     });
 
     // Send verification email using new email service
-    await sendEmail(email, 'verification', otpCode);
+    await sendEmail(email, "verification", otpCode);
 
     return createdResponse(
       res,
@@ -263,7 +269,7 @@ export async function sendVerificationEmail(req, res) {
     });
 
     // Send email using new email service
-    await sendEmail(email, 'verification', otpCode);
+    await sendEmail(email, "verification", otpCode);
 
     return successResponse(res, null, "Verification code sent successfully");
   } catch (error) {
@@ -289,7 +295,7 @@ export async function verifyEmail(req, res) {
         expiresAt: { [Op.gt]: new Date() },
       },
     });
-    
+
     if (!otp) {
       // Increment attempts if OTP exists but is invalid
       const existingOtp = await OTP.findOne({
@@ -305,7 +311,10 @@ export async function verifyEmail(req, res) {
         await existingOtp.increment("attempts");
         if (existingOtp.attempts >= 3) {
           await existingOtp.update({ isUsed: true });
-          return badRequestResponse(res, "Too many attempts. Please request a new code.");
+          return badRequestResponse(
+            res,
+            "Too many attempts. Please request a new code."
+          );
         }
       }
 
@@ -318,7 +327,7 @@ export async function verifyEmail(req, res) {
     // Mark OTP as used, verify email, and update refresh token
     await Promise.all([
       otp.update({ isUsed: true }),
-      user.update({ 
+      user.update({
         isEmailVerified: true,
         refreshToken,
         refreshTokenExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
@@ -337,7 +346,7 @@ export async function verifyEmail(req, res) {
       user: userData,
       accessToken,
       refreshToken,
-      message: "Email verified successfully"
+      message: "Email verified successfully",
     });
   } catch (error) {
     return errorResponse(res, error.message);
@@ -371,7 +380,7 @@ export async function forgotPassword(req, res) {
     });
 
     // Send email using new email service
-    await sendEmail(email, 'passwordReset', otpCode);
+    await sendEmail(email, "passwordReset", otpCode);
 
     return successResponse(
       res,
@@ -495,7 +504,7 @@ export async function resendVerificationOTP(req, res) {
     });
 
     // Send email using new email service
-    await sendEmail(email, 'verification', otpCode);
+    await sendEmail(email, "verification", otpCode);
 
     return successResponse(
       res,
@@ -561,7 +570,7 @@ export async function resendPasswordResetOTP(req, res) {
     });
 
     // Send email using new email service
-    await sendEmail(email, 'passwordReset', otpCode);
+    await sendEmail(email, "passwordReset", otpCode);
 
     return successResponse(
       res,
@@ -583,7 +592,10 @@ export async function changePassword(req, res) {
       return unauthorizedResponse(res, "User not found");
     }
 
-    const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+    const isValidPassword = await bcrypt.compare(
+      currentPassword,
+      user.password
+    );
     if (!isValidPassword) {
       return badRequestResponse(res, "Current password is incorrect");
     }
