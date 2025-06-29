@@ -21,17 +21,12 @@ const generateOTP = () => {
 
 // Helper function to generate tokens
 const generateTokens = (userId) => {
-  // const accessToken = jwt.sign(
-  //   { userId, tokenType: "access" },
-  //   config.jwt.secret,
-  //   { expiresIn: config.jwt.accessExpiry }
-  // );
-  // make the expire time 5 secon for test purpose.
   const accessToken = jwt.sign(
     { userId, tokenType: "access" },
     config.jwt.secret,
-    { expiresIn: "5s" } // For testing purposes, set to 5 seconds
+    { expiresIn: config.jwt.accessExpiry }
   );
+  // make the expire time 5 secon for test purpose.
 
   const refreshToken = jwt.sign(
     { userId, tokenType: "refresh" },

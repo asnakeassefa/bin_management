@@ -159,6 +159,52 @@ export const userController = {
         } catch (error) {
             return errorResponse(res, error.message);
         }
+    },
+
+    // Update the authenticated user's profile (name and country only)
+    async editProfile(req, res) {
+        try {
+            const userId = req.user.id;
+            const { fullName, country } = req.body;
+
+            // Validate input
+            if (!fullName && !country) {
+                return badRequestResponse(res, 'At least one of fullName or country must be provided');
+            }
+
+            // Validate country if provided
+            let upperCode;
+            if (country) {
+                upperCode = country.toUpperCase();
+                if (!Object.keys(UK_COUNTRIES).includes(upperCode)) {
+                    return badRequestResponse(res, 'Invalid country code. Must be one of: GB-ENG, GB-WLS, GB-SCT, GB-NIR');
+                }
+            }
+
+            const user = await User.findByPk(userId);
+            if (!user) {
+                return notFoundResponse(res, 'User not found');
+            }
+
+            if (fullName) user.fullName = fullName;
+            if (country) user.country = upperCode;
+
+            await user.save();
+
+            const {
+                password: _,
+                refreshToken: __,
+                refreshTokenExpiry: ___,
+                ...userData
+            } = user.toJSON();
+
+            return successResponse(res, {
+                message: 'Profile updated successfully',
+                user: userData
+            });
+        } catch (error) {
+            return errorResponse(res, error.message);
+        }
     }
 
 };
